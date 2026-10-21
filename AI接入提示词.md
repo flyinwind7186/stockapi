@@ -2,14 +2,14 @@
 
 复制下面整段，贴给正在改你项目的 AI。它会先问几个问题，你回答完，它再改代码。
 
-初次使用，如果对产品还有疑虑，可以用同花顺模拟账户测试。须使用模拟账户的资金账户：它是一串纯数字，带英文字母的不是，手机号也不是。怎么查，看 [模拟账户.md](模拟账户.md)。
+初次使用，如果对产品还有疑虑，可以用同花顺模拟账户测试。登录账号填手机号、同花顺账户或股东账户，三选一，资金账号留空。填法看 [模拟账户.md](模拟账户.md)。
 
 ## 交易
 
 ```text
 你在帮我把现有项目接到 thsapi.dll。先问我下面这些问题，我回答完再改代码。不要一次改很多无关的东西。
 
-项目和示例在 https://github.com/jyApiZx/stockapi 。交易测试包 1.0.3，里面是 thsapi.dll、xdDemo.exe 和 ths.xml。64 位：https://github.com/jyApiZx/stockapi/releases/download/v1.0.3/thsapi_1.0.3_x64.zip 。32 位：https://github.com/jyApiZx/stockapi/releases/download/v1.0.3/thsapi_1.0.3_x32.zip 。能用 64 位就用 64 位。模拟账户怎么拿：https://github.com/jyApiZx/stockapi/blob/main/模拟账户.md 。
+项目和示例在 https://github.com/jyApiZx/stockapi 。交易测试包 1.0.5，里面是 thsapi.dll、xdDemo.exe 和 ths.xml。64 位：https://github.com/jyApiZx/stockapi/releases/download/v1.0.5/thsapi_1.0.5_x64.zip 。32 位：https://github.com/jyApiZx/stockapi/releases/download/v1.0.5/thsapi_1.0.5_x32.zip 。能用 64 位就用 64 位。模拟账户怎么填：https://thsapi.com/sim.html 。
 
 先问：
 1. 项目是 C++、C#、Python 还是 Java？程序是不是 64 位？能用 64 位就用 64 位。32 位程序只能配 32 位 DLL。Python 先看本机 Python 是不是 64 位。
@@ -19,7 +19,7 @@
 登录不要问我券商 IP、端口、营业部、qs_id。这些到我下载包里的 ths.xml，按券商名字查。模拟炒股是 qs_id 356，地址 trade.10jqka.com.cn，端口 8002，营业部 48。
 
 登录规则：
-- 模拟炒股：登录账号和资金账号都填模拟资金账户。它是纯数字，没有字母。不要填同花顺登录账号，那个经常带字母，登不上去。通讯密码留空。查法见 https://thsapi.com/sim.html 。
+- 模拟炒股：登录账号填手机号、同花顺账户或股东账户，三选一。资金账号留空。通讯密码留空。填法见 https://thsapi.com/sim.html 。
 - 大多数券商只要资金账号和交易密码。account_type 用 0。交易账号和通讯密码都传空字符串 ""。
 - 华泰证券要客户号。资金账号一般和客户号相同。通讯密码和交易密码都要填。account_type 用 "k"。
 - 信用账户：登录账号在普通资金账号开头加大写 X。资金账号填信用资金账号，不要加 X。普通账户不要加 X。

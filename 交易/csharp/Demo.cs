@@ -34,7 +34,7 @@ internal static class ThsApi
     /// 示例: {"qs_id":356,"account_type":0}
     /// </param>
     /// <param name="yybId">营业部代码。模拟炒股为 48。</param>
-    /// <param name="accountNo">登录账号。模拟账户的登录号和资金账号都填模拟资金账号。</param>
+    /// <param name="accountNo">登录账号。模拟账户登录账号填手机号、同花顺账户或股东账户，资金账号留空。</param>
     /// <param name="tradeAccount">交易账号，一般与登录账号相同。空则按登录账号处理。</param>
     /// <param name="jyPassword">交易密码。</param>
     /// <param name="txPassword">通讯密码。大部分券商传空字符串，个别券商需要填写。</param>
@@ -251,7 +251,7 @@ internal static class Program
     {
         var err = NewErr();
 
-        // qs_id 356、端口 8002、营业部 48 是同花顺模拟炒股站点。账号和密码换成模拟资金账号。
+        // qs_id 356、端口 8002、营业部 48 是同花顺模拟炒股站点。账号换成手机号、同花顺账户或股东账户，资金账号留空，密码换成模拟交易密码。
         string config = "{\"qs_id\":356,\"account_type\":0}";
 
         ThsApi.Init();
@@ -263,7 +263,7 @@ internal static class Program
             config,
             48,
             "YOUR_ACCOUNT",
-            "YOUR_ACCOUNT",
+            "",
             "YOUR_PASSWORD",
             "",
             err);

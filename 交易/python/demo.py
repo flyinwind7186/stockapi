@@ -36,7 +36,7 @@ UnInit.restype = None
 #   account_type：0 资金帐户，1 深圳，2 上海，3 基金，4 深圳Ｂ股，5 上海Ｂ股，k 客户号。
 #   示例: {"qs_id":356,"account_type":0}
 # yyb_id：营业部代码。模拟炒股为 48。
-# account_no：登录账号。模拟账户的登录号和资金账号都填模拟资金账号。
+# account_no：登录账号。模拟账户登录账号填手机号、同花顺账户或股东账户，资金账号留空。
 # trade_account：交易账号，一般与登录账号相同。空则按登录账号处理。
 # jy_password：交易密码。
 # tx_password：通讯密码。大部分券商传空字符串，个别券商需要填写。
@@ -274,7 +274,7 @@ def query(client_id, category, name):
 def main():
     err_info = create_string_buffer(256)
 
-    # qs_id 356、端口 8002、营业部 48 是同花顺模拟炒股站点。账号和密码换成模拟资金账号。
+    # qs_id 356、端口 8002、营业部 48 是同花顺模拟炒股站点。账号换成手机号、同花顺账户或股东账户，资金账号留空，密码换成模拟交易密码。
     config = '{"qs_id":356,"account_type":0}'
 
     Init()
@@ -282,7 +282,7 @@ def main():
 
     client_id = Logon(
         gbk("trade.10jqka.com.cn"), 8002, gbk(config), 48,
-        gbk("YOUR_ACCOUNT"), gbk("YOUR_ACCOUNT"), gbk("YOUR_PASSWORD"), gbk(""), err_info)
+        gbk("YOUR_ACCOUNT"), gbk(""), gbk("YOUR_PASSWORD"), gbk(""), err_info)
     if client_id < 0:
         print("Logon 失败: " + text(err_info))
         UnInit()

@@ -1,16 +1,16 @@
-# 通达信/同花顺纯协议交易接口(下面有下载链接,可直接测试)
+# 同花顺交易接口(下面有下载链接,可直接测试)
 
-**同花顺/通达信纯协议交易接口，L1、L2 行情接口。直连券商，无需启动客户端，支持所有券商。产品介绍见 [thsapi.com](https://thsapi.com/)。技术支持请联系 [Telegram：@Thsapi](https://t.me/Thsapi)**
+**同花顺交易接口，L1、L2 行情接口。直连券商，无需启动客户端，支持所有券商。产品介绍见 [thsapi.com](https://thsapi.com/)。技术支持请联系 [Telegram：@Thsapi](https://t.me/Thsapi)**
 
 交易库是 `thsapi.dll`，行情库是 `HqApi.dll`，都有 32 位和 64 位。Python、Java、C#、C/C++ 都可以接。下面按使用顺序说明授权、安全和安装。调用参数见后文，也可以看 [thsapi.com](https://thsapi.com/)。
 
 ## 下载试用
 
-交易测试包 1.0.3，里面是 `thsapi.dll`、`xdDemo.exe` 和券商站点列表：[64 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.3/thsapi_1.0.3_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.3/thsapi_1.0.3_x32.zip)。
+交易测试包 1.0.5，里面是 `thsapi.dll`、`xdDemo.exe` 和券商站点列表：[64 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.5/thsapi_1.0.5_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.5/thsapi_1.0.5_x32.zip)。
 
 行情测试包 1.0.3，里面是 `HqApi.dll` 和行情测试程序，L1 和 L2 都在包里：[64 位](https://github.com/jyApiZx/stockapi/releases/download/hqapi-1.0.3/hqapi_1.0.3_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/hqapi-1.0.3/hqapi_1.0.3_x32.zip)。
 
-初次使用，如果您对产品还有疑虑，可以用同花顺模拟账户测试。须使用**模拟账户的资金账户**：它是一串纯数字，带英文字母的不是，手机号也不是。[模拟账户的资金账户怎么查](https://thsapi.com/sim.html)，仓库说明见 [模拟账户.md](模拟账户.md)。
+初次使用，如果您对产品还有疑虑，可以用同花顺模拟账户测试。登录账号填手机号、同花顺账户或股东账户，三选一，资金账号留空。[模拟账户怎么填](https://thsapi.com/sim.html)，仓库说明见 [模拟账户.md](模拟账户.md)。
 
 ## 调用示例
 
@@ -92,7 +92,7 @@ DLL 只在你的程序调用时工作，读不到策略源码。证券账户的�
 
 下单用 `SendOrder`，撤单用 `CancelOrder`。需要一次提交多笔时，用 `SendOrders`、`CancelOrders`；多个账户一起提交时，用 `SendMultiAccountsOrders`、`CancelMultiAccountsOrders`。批量调用不用等上一笔返回后再发下一笔，实际成交速度仍受券商限速约束。可买可卖用 `GetTradableQuantity` 或 `GetCanBuySell`，打新用 `OneClickIpo`，场内基金和 ETF 用 `FundOrder`，信用账户直接还款用 `Repay`。
 
-通讯密码多数券商填空字符串，少数券商要填。先在 `xdDemo.exe` 里用同一组参数登录成功，再写进程序。模拟站点是 `trade.10jqka.com.cn`，端口 `8002`，营业部 `48`，`qs_id` 为 `356`。登录账号和资金账号都填模拟资金账号。
+通讯密码多数券商填空字符串，少数券商要填。先在 `xdDemo.exe` 里用同一组参数登录成功，再写进程序。模拟站点是 `trade.10jqka.com.cn`，端口 `8002`，营业部 `48`，`qs_id` 为 `356`。登录账号填手机号、同花顺账户或股东账户，三选一，资金账号留空。
 
 ## 二、授权价格
 
@@ -117,7 +117,7 @@ DLL 只在你的程序调用时工作，读不到策略源码。证券账户的�
 
 ### （三）先用模拟盘
 
-初次使用可以先用同花顺模拟账户。登录账号和资金账号都填模拟资金账户，一串纯数字，没有字母；同花顺登录账号经常带字母，拿去登录会失败。通讯密码留空。先打开 `xdDemo.exe` 登录成功，再写进自己的程序。怎么查资金账户，看 [模拟账户.md](模拟账户.md)。
+初次使用可以先用同花顺模拟账户。登录账号填手机号、同花顺账户或股东账户，三选一，资金账号留空。通讯密码留空。先打开 `xdDemo.exe` 登录成功，再写进自己的程序。填法看 [模拟账户.md](模拟账户.md)。
 
 ## 四、服务支持
 
@@ -297,4 +297,4 @@ A 股：`TdxHq_Connect` → 各类查询 → `TdxHq_Disconnect`。扩展行情�
 
 ---
 
-交易示例已填同花顺模拟炒股站点。账号、密码请换成模拟资金账号，通讯密码多数留空。语言导航在上面的 [调用示例](#调用示例)。
+交易示例已填同花顺模拟炒股站点。账号换成手机号、同花顺账户或股东账户，资金账号留空，密码换成模拟交易密码，通讯密码多数留空。语言导航在上面的 [调用示例](#调用示例)。

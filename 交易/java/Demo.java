@@ -10,6 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Demo {
+    // 必须自己留住这个对象，否则回调还在时会被回收。
+    private static PushCb pushKeep;
+
+    public interface PushCb extends StdCallLibrary.StdCallCallback {
+        void invoke(int clientId, int functionId, Pointer tsv, int tsvLen, Pointer userData);
+    }
+
     static {
         // 必须在第一次使用 JNA 之前设置，字符串按 GBK 传入 DLL。
         System.setProperty("jna.encoding", "GBK");
@@ -39,6 +46,31 @@ public class Demo {
 
         // 注销指定 ClientID。
         void Logoff(int clientId);
+
+        // 服务器推送回调。Tsv 为 GBK。一次回调只有一张表：第一行表头，第二行这一条推送。
+        // 列用制表符分隔，行末是换行。指针只在本次回调返回前有效，返回后不可再读。
+        // 表头文字和列顺序固定，不会调整，也不会增删列。某列没有值时留空，后面的列不会往前挪，按列下标读取即可。
+        // 13 列依次是：ClientID、推送类型、证券代码、方向、价格、数量、金额、状态、成交时间、股东代码、成交编号、剩余数量、摘要。
+        // 分笔成交会回调多次，每次仍是「表头 + 一行」。数量、价格、金额是这一笔自己的数字；剩余数量是这一笔之后还没成交的股数。
+        // 下面是同一笔委托分三次成交的例子，股东代码和成交编号都是虚构的。
+        // 第一次，成交 300 股，还剩 600 股：
+        // ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+        // 1	成交	600000	买入	12.30	300	3690.00	部分成交	09:31:02	SH90000001	CJ10001	600	成交回报
+        // 第二次，再成交 400 股，还剩 200 股：
+        // ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+        // 1	成交	600000	买入	12.30	400	4920.00	部分成交	09:31:05	SH90000001	CJ10002	200	成交回报
+        // 第三次，剩下 200 股成交：
+        // ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+        // 1	成交	600000	买入	12.31	200	2462.00	全部成交	09:31:08	SH90000001	CJ10003	0	成交回报
+        // functionId：推送功能号，当前为 2304。
+        // tsvLen：Tsv 字节数，不含结尾 0。
+        // userData：注册时传入的指针，原样回传。
+
+        // 注册或注销服务器推送回调。callback 为空表示注销。
+        // 回调在独立线程串行执行，里面可以再调用 QueryData。不要在回调里 Logoff 或 UnInit。
+        // 从回调线程里注销只停止后续推送；从外部注销会等当前回调结束。
+        // 返回 0 成功；-1 表示 ClientID 无效。
+        int SetPushCallback(int clientId, PushCb callback, Pointer userData);
 
         // 查询当日交易数据。成功返回 0，失败返回 -1。
         // category：
@@ -164,6 +196,32 @@ public class Demo {
         System.out.println("Logon 成功 clientId=" + clientId);
         System.out.println();
 
+        pushKeep = new PushCb() {
+            public void invoke(int id, int functionId, Pointer tsv, int tsvLen, Pointer userData) {
+                byte[] raw = (tsv == null || tsvLen <= 0) ? new byte[0] : tsv.getByteArray(0, tsvLen);
+                String text;
+                try {
+                    text = new String(raw, "GBK");
+                } catch (java.io.UnsupportedEncodingException e) {
+                    text = "";
+                }
+                System.out.println("======== push functionId=" + functionId + " clientId=" + id + " ========");
+                System.out.println(text);
+                String[] lines = text.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
+                String line = lines.length > 1 ? lines[1] : "";
+                String[] cols = line.split("\t", -1);
+                if (cols.length >= 13) {
+                    System.out.println("推送类型=" + cols[1]
+                            + " 证券代码=" + cols[2]
+                            + " 方向=" + cols[3]
+                            + " 数量=" + cols[5]
+                            + " 状态=" + cols[7]
+                            + " 剩余数量=" + cols[11]);
+                }
+            }
+        };
+        System.out.println("SetPushCallback rc=" + api.SetPushCallback(clientId, pushKeep, null));
+
         String shareholder = "";
         String exchangeId = "1";
         String entrustId = "";
@@ -205,6 +263,7 @@ public class Demo {
         // api.CancelOrder(clientId, exchangeId, entrustId, orderResult, orderErr);
 
         System.out.println("下单/撤单已注释。股东=" + shareholder + " exchangeId=" + exchangeId + " 委托编号=" + entrustId);
+        api.SetPushCallback(clientId, null, null);
         api.Logoff(clientId);
         api.UnInit();
     }

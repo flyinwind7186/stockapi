@@ -31,6 +31,74 @@ typedef int (__stdcall* LogonFn)(const char* IP, short Port, const char* Config,
 // 注销指定 ClientID。
 typedef void (__stdcall* LogoffFn)(int ClientID);
 
+// 服务器推送回调。Tsv 为 GBK。一次回调只有一张表：第一行表头，第二行这一条推送。
+// 列用制表符分隔，行末是换行。指针只在本次回调返回前有效，返回后不可再读。
+// 表头文字和列顺序固定，不会调整，也不会增删列。某列没有值时留空，后面的列不会往前挪，按列下标读取即可。
+// 13 列依次是：ClientID、推送类型、证券代码、方向、价格、数量、金额、状态、成交时间、股东代码、成交编号、剩余数量、摘要。
+// 分笔成交会回调多次，每次仍是「表头 + 一行」。数量、价格、金额是这一笔自己的数字；剩余数量是这一笔之后还没成交的股数。
+// 下面是同一笔委托分三次成交的例子，股东代码和成交编号都是虚构的。
+// 第一次，成交 300 股，还剩 600 股：
+// ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+// 1	成交	600000	买入	12.30	300	3690.00	部分成交	09:31:02	SH90000001	CJ10001	600	成交回报
+// 第二次，再成交 400 股，还剩 200 股：
+// ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+// 1	成交	600000	买入	12.30	400	4920.00	部分成交	09:31:05	SH90000001	CJ10002	200	成交回报
+// 第三次，剩下 200 股成交：
+// ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+// 1	成交	600000	买入	12.31	200	2462.00	全部成交	09:31:08	SH90000001	CJ10003	0	成交回报
+// FunctionID：推送功能号，当前为 2304。
+// TsvLen：Tsv 字节数，不含结尾 0。
+// UserData：注册时传入的指针，原样回传。
+typedef void (__stdcall* ThsPushCallback)(
+    int ClientID, int FunctionID, const char* Tsv, int TsvLen, void* UserData);
+
+// 注册或注销服务器推送回调。Callback 为空表示注销。
+// 回调在独立线程串行执行，里面可以再调用 QueryData。不要在回调里 Logoff 或 UnInit。
+// 从回调线程里注销只停止后续推送；从外部注销会等当前回调结束。
+// 返回 0 成功；-1 表示 ClientID 无效。
+typedef int (__stdcall* SetPushCallbackFn)(int ClientID, ThsPushCallback Callback, void* UserData);
+
+// 回调里先把 Tsv 拷走，再按制表符拆第二行。列下标与上面的表头一致。
+static void __stdcall OnPush(int clientId, int functionId, const char* tsv, int tsvLen, void*)
+{
+    std::string text;
+    if (tsv && tsvLen > 0)
+        text.assign(tsv, tsv + tsvLen);
+    std::cout << "======== push functionId=" << functionId << " clientId=" << clientId << " ========" << std::endl;
+    std::cout << text;
+    if (text.empty() || text[text.size() - 1] != '\n')
+        std::cout << std::endl;
+
+    size_t head = text.find('\n');
+    size_t start = head == std::string::npos ? 0 : head + 1;
+    size_t stop = text.find('\n', start);
+    std::string line = text.substr(start, stop == std::string::npos ? std::string::npos : stop - start);
+    std::vector<std::string> cols;
+    std::string cur;
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+        if (line[i] == '\t')
+        {
+            cols.push_back(cur);
+            cur.clear();
+        }
+        else if (line[i] != '\r')
+        {
+            cur.push_back(line[i]);
+        }
+    }
+    cols.push_back(cur);
+    if (cols.size() >= 13)
+    {
+        std::cout << "推送类型=" << cols[1]
+            << " 证券代码=" << cols[2]
+            << " 方向=" << cols[3]
+            << " 数量=" << cols[5]
+            << " 状态=" << cols[7]
+            << " 剩余数量=" << cols[11] << std::endl;
+    }
+}
+
 // 查询当日交易数据。成功返回 0，失败返回 -1。
 // Category：
 //   0 资金  1 股份  2 当日委托  3 当日成交  4 可撤单  5 股东代码
@@ -285,6 +353,7 @@ int main()
     LogonFn Logon = (LogonFn)GetProcAddress(dll, "Logon");
     LogoffFn Logoff = (LogoffFn)GetProcAddress(dll, "Logoff");
     QueryDataFn QueryData = (QueryDataFn)GetProcAddress(dll, "QueryData");
+    SetPushCallbackFn SetPushCallback = (SetPushCallbackFn)GetProcAddress(dll, "SetPushCallback");
     EnableResultColumnIdSuffixFn EnableResultColumnIdSuffix =
         (EnableResultColumnIdSuffixFn)GetProcAddress(dll, "EnableResultColumnIdSuffix");
 
@@ -319,6 +388,9 @@ int main()
     }
 
     std::cout << "Logon 成功 clientId=" << clientId << std::endl << std::endl;
+
+    if (SetPushCallback)
+        std::cout << "SetPushCallback rc=" << SetPushCallback(clientId, OnPush, nullptr) << std::endl;
 
     // 本示例只查 0–5。两融和新股类别在普通账户上可能失败，甚至把连接踢掉。
     const int categories[] = { 0, 1, 2, 3, 4, 5 };
@@ -375,6 +447,8 @@ int main()
 
     std::cout << "下单/撤单已注释。股东=" << shareholder << " exchangeId=" << exchangeId << " 委托编号=" << entrustId << std::endl;
 
+    if (SetPushCallback)
+        SetPushCallback(clientId, nullptr, nullptr);
     Logoff(clientId);
     UnInit();
     delete[] result;

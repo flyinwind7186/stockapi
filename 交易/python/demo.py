@@ -4,8 +4,8 @@
 # ErrInfo 建议 >= 256 字节，Result 建议 >= 1024*1024 字节。没出错时 ErrInfo 为空字符串。
 
 from ctypes import (
-    WinDLL, c_int, c_short, c_float, c_char_p, POINTER,
-    create_string_buffer,
+    WinDLL, WINFUNCTYPE, c_int, c_short, c_float, c_char_p, c_void_p, POINTER,
+    create_string_buffer, string_at,
 )
 
 dll = WinDLL(".\\thsapi.dll")
@@ -49,6 +49,51 @@ Logon.restype = c_int
 Logoff = dll.Logoff
 Logoff.argtypes = [c_int]
 Logoff.restype = None
+
+# 服务器推送回调。Tsv 为 GBK。一次回调只有一张表：第一行表头，第二行这一条推送。
+# 列用制表符分隔，行末是换行。指针只在本次回调返回前有效，返回后不可再读。
+# 表头文字和列顺序固定，不会调整，也不会增删列。某列没有值时留空，后面的列不会往前挪，按列下标读取即可。
+# 13 列依次是：ClientID、推送类型、证券代码、方向、价格、数量、金额、状态、成交时间、股东代码、成交编号、剩余数量、摘要。
+# 分笔成交会回调多次，每次仍是「表头 + 一行」。数量、价格、金额是这一笔自己的数字；剩余数量是这一笔之后还没成交的股数。
+# 下面是同一笔委托分三次成交的例子，股东代码和成交编号都是虚构的。
+# 第一次，成交 300 股，还剩 600 股：
+# ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+# 1	成交	600000	买入	12.30	300	3690.00	部分成交	09:31:02	SH90000001	CJ10001	600	成交回报
+# 第二次，再成交 400 股，还剩 200 股：
+# ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+# 1	成交	600000	买入	12.30	400	4920.00	部分成交	09:31:05	SH90000001	CJ10002	200	成交回报
+# 第三次，剩下 200 股成交：
+# ClientID	推送类型	证券代码	方向	价格	数量	金额	状态	成交时间	股东代码	成交编号	剩余数量	摘要
+# 1	成交	600000	买入	12.31	200	2462.00	全部成交	09:31:08	SH90000001	CJ10003	0	成交回报
+# function_id：推送功能号，当前为 2304。
+# tsv_len：Tsv 字节数，不含结尾 0。
+# user：注册时传入的指针，原样回传。
+PushCallback = WINFUNCTYPE(None, c_int, c_int, c_char_p, c_int, c_void_p)
+
+
+def on_push(client_id, function_id, tsv, tsv_len, user):
+    raw = string_at(tsv, tsv_len) if tsv and tsv_len > 0 else b""
+    text = raw.decode("gbk", errors="replace")
+    print("======== push functionId=%s clientId=%s ========" % (function_id, client_id))
+    print(text)
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    line = lines[1] if len(lines) > 1 else ""
+    cols = line.split("\t")
+    if len(cols) >= 13:
+        print("推送类型=%s 证券代码=%s 方向=%s 数量=%s 状态=%s 剩余数量=%s" % (
+            cols[1], cols[2], cols[3], cols[5], cols[7], cols[11]))
+
+
+# 必须自己留住这个对象，否则回调还在时会被回收。
+push_keep = PushCallback(on_push)
+
+# 注册或注销服务器推送回调。callback 为空表示注销。
+# 回调在独立线程串行执行，里面可以再调用 QueryData。不要在回调里 Logoff 或 UnInit。
+# 从回调线程里注销只停止后续推送；从外部注销会等当前回调结束。
+# 返回 0 成功；-1 表示 ClientID 无效。
+SetPushCallback = dll.SetPushCallback
+SetPushCallback.argtypes = [c_int, PushCallback, c_void_p]
+SetPushCallback.restype = c_int
 
 # 查询当日交易数据。成功返回 0，失败返回 -1。
 # category：
@@ -290,6 +335,7 @@ def main():
 
     print("Logon 成功 clientId=%s" % client_id)
     print("")
+    print("SetPushCallback rc=%s" % SetPushCallback(client_id, push_keep, None))
 
     shareholder = ""
     exchange_id = "1"
@@ -319,6 +365,7 @@ def main():
     # print("CancelOrder err=" + text(cancel_err))
 
     print("下单/撤单已注释。股东=%s exchangeId=%s 委托编号=%s" % (shareholder, exchange_id, entrust_id))
+    SetPushCallback(client_id, None, None)
     Logoff(client_id)
     UnInit()
 

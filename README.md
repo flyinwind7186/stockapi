@@ -6,9 +6,9 @@
 
 ## 下载试用
 
-交易测试包 1.0.5，里面是 `thsapi.dll`、`xdDemo.exe` 和券商站点列表：[64 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.5/thsapi_1.0.5_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.5/thsapi_1.0.5_x32.zip)。
+交易测试包 1.0.6，里面是 `thsapi.dll`、`xdDemo.exe` 和券商站点列表：[64 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.6/thsapi_1.0.6_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/v1.0.6/thsapi_1.0.6_x32.zip)。
 
-行情测试包 1.0.3，里面是 `HqApi.dll` 和行情测试程序，L1 和 L2 都在包里：[64 位](https://github.com/jyApiZx/stockapi/releases/download/hqapi-1.0.3/hqapi_1.0.3_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/hqapi-1.0.3/hqapi_1.0.3_x32.zip)。
+行情测试包 1.0.6，里面是 `HqApi.dll` 和行情测试程序，L1 和 L2 都在包里：[64 位](https://github.com/jyApiZx/stockapi/releases/download/hqapi-1.0.6/hqapi_1.0.6_x64.zip)、[32 位](https://github.com/jyApiZx/stockapi/releases/download/hqapi-1.0.6/hqapi_1.0.6_x32.zip)。
 
 初次使用，如果您对产品还有疑虑，可以用同花顺模拟账户测试。登录账号填手机号、同花顺账户或股东账户，三选一，资金账号留空。[模拟账户怎么填](https://thsapi.com/sim.html)，仓库说明见 [模拟账户.md](模拟账户.md)。
 
@@ -36,11 +36,11 @@
 
 ## 一、这是什么接口
 
-把交易和行情调用放进自己的程序：登录后查询资金、持仓、委托和成交，再下单、撤单。行情由程序主动查询，不是服务器往程序里推。
+把交易和行情调用放进自己的程序：登录后查询资金、持仓、委托和成交，再下单、撤单。成交发生时，登录后注册 `SetPushCallback`，分笔成交会逐条回调。行情仍由程序主动查询。
 
 ### （一）产品功能
 
-- 直连券商交易服务器，中间不经过客户端。支持普通账户和融资融券账户的下单、撤单、查询，以及融资买入、融券卖出、担保品买卖、买券还券、卖券还款、直接还款和新股申购。
+- 直连券商交易服务器，中间不经过客户端。支持普通账户和融资融券账户的下单、撤单、查询和成交回报，以及融资买入、融券卖出、担保品买卖、买券还券、卖券还款、直接还款和新股申购。
 - 可以单账户操作，也可以多个账户同时保持连接。同一账户有批量查询、批量下单、批量撤单；多个账户有 `QueryMultiAccountsDatas`、`SendMultiAccountsOrders`、`CancelMultiAccountsOrders`。同一个 `ClientID` 请串行调用，不同账户可以并行。
 - 交易连接有心跳，断线会重连。下单耗时主要取决于到券商的网络和券商限速。64 位大约比 32 位快 30%。
 - 交易连接上可以直接取五档快照：`GetQuote`、`GetQuotes`、`GetMultiAccountsQuotes`。独立行情库 `HqApi.dll` 另外提供 L1 和 L2。L1 是实时行情、Tick、五档和分钟 K 线；L2 是十档、买卖队列和逐笔。
@@ -183,6 +183,13 @@ DLL 只在你的程序调用时工作，读不到策略源码。证券账户的�
 | `QueryHistoryData` | 历史委托、历史成交、交割单、资金明细、对账单（日期 `yyyyMMdd`） |
 | `QueryDatas` | 同一账户、多 `Category` 批量查询 |
 | `QueryMultiAccountsDatas` | 多账户批量查询 |
+| `SetPushCallback` | 登录成功后注册成交回报；空回调表示注销 |
+
+登录成功后调用一次 `SetPushCallback`。券商有推送时，接口在单独线程里调用回调。文本是 GBK，第一行表头，第二行一条记录。列依次是 `ClientID`、`推送类型`、`证券代码`、`方向`、`价格`、`数量`、`金额`、`状态`、`成交时间`、`股东代码`、`成交编号`、`剩余数量`、`摘要`。指针只在回调返回前有效。`FunctionID` 当前为 2304。返回 0 成功，-1 表示 `ClientID` 无效。
+
+推送类型有 `成交`、`公告`、`登录`、`系统状态`。成交的方向：`1` 为 `买入`，`2` 为 `卖出`。成交的状态：`1` 为 `部分成交`，`2` 为 `全部成交`，其他状态保留数字。分笔成交会逐条回调。数量、价格、金额按券商原文。剩余数量在纯数字且能被 100 整除时除以 100，按股给出，否则保留原文。
+
+这是通知，不能代替 `QueryData` 的当日成交。推送里的成交编号不是柜台合同编号。回调里可以再查 `QueryData`，不要在回调里 `Logoff` 或 `UnInit`。处理得慢时，还没送出的推送最多留 64 条，更早的会被丢掉。C#、Python、Java 要自己留住回调对象，释放前先注销。
 
 ### 下单与撤单
 
